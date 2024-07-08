@@ -1,72 +1,63 @@
-#include <iostream>
-#include <string>
 #include <unordered_map>
+#include <cctype>
+#include <string>
+#include <numeric> // Include numeric header for std::accumulate
 
-// Function to get the Soundex code for a character
 char getSoundexCode(char c) {
-    c = toupper(c);
-    std::unordered_map<char, char> mapping = {
+    static const std::unordered_map<char, char> soundexMap {
         {'B', '1'}, {'F', '1'}, {'P', '1'}, {'V', '1'},
-        {'C', '2'}, {'G', '2'}, {'J', '2'}, {'K', '2'}, {'Q', '2'}, {'S', '2'}, {'X', '2'}, {'Z', '2'},
+        {'C', '2'}, {'G', '2'}, {'J', '2'}, {'K', '2'},
+        {'Q', '2'}, {'S', '2'}, {'X', '2'}, {'Z', '2'},
         {'D', '3'}, {'T', '3'},
         {'L', '4'},
         {'M', '5'}, {'N', '5'},
         {'R', '6'}
     };
-    auto it = mapping.find(c);
-    return it != mapping.end() ? it->second : '0';  // Default to '0' for non-mapped characters
+    c = std::toupper(c);
+    auto it = soundexMap.find(c);
+    if (it != soundexMap.end()) {
+        return it->second;
+    }
+    return '0'; // Default case
 }
 
-// Function to compare characters and previous code
-std::string comparison(char ch, char prev_code) {
-    if (ch != '0' && ch != prev_code) {
-        return std::string(1, ch);
-    } else {
-        return "";
-    }
+// Function to determine if a character is 'H' or 'W'
+bool isHW(char c) {
+    return c == 'h' || c == 'w';
 }
 
-// Function to map the name to Soundex codes
-std::string numMap(const std::string& name, char prev_code) {
-    std::string soundex;
-    for (size_t i = 1; i < name.length(); ++i) {
-        char ch = getSoundexCode(name[i]);
-        std::string code = comparison(ch, prev_code);
-        if (!code.empty()) {
-            soundex += code;
-            prev_code = ch;
-        }
-    }
-    return soundex;
+// Function to determine if a character should be appended based on Soundex rules
+bool shouldAppend(char code, char prevCode, char currentChar) {
+    return (code != '0' && code != prevCode) || isHW(currentChar);
 }
 
-// Function to generate the Soundex for a name
-std::string generateSoundex(const std::string& name) {
-    if (name.empty()) {
-        return "";
-    } else {
-        std::string soundex(1, toupper(name[0]));
-        char prev_code = getSoundexCode(soundex[0]);
-        soundex += numMap(name, prev_code);
-        if (soundex.length() > 4) {
-            soundex = soundex.substr(0, 4);
-        }
-    }
-
-    // Pad with zeros if necessary
-    soundex = soundex.append(4 - soundex.length(), '0');
+// Function to accumulate Soundex codes from name
+std::string accumulateSoundexCodes(const std::string& name) {
+    if (name.empty()) return "0000"; // Return "0000" for empty strings
+    std::string soundex(1, toupper(name[0]));
+    char prevCode = getSoundexCode(name[0]);
     
-    return soundex;
+    return std::accumulate(name.begin() + 1, name.end(), std::move(soundex),
+        [&prevCode](std::string& acc, char c) {
+            char code = getSoundexCode(c);
+            if (shouldAppend(code, prevCode, c)) {
+                acc += code;
+                prevCode = code;
+            }
+            return acc;
+        });
 }
 
-int main() {
-    // Test cases
-    std::cout << generateSoundex("Robert") << std::endl;  // Output: R163
-    std::cout << generateSoundex("Rupert") << std::endl;  // Output: R163
-    std::cout << generateSoundex("Rubin") << std::endl;   // Output: R150
-    std::cout << generateSoundex("Ashcraft") << std::endl;// Output: A261
-    std::cout << generateSoundex("Ashcroft") << std::endl;// Output: A261
-    std::cout << generateSoundex("Pfister") << std::endl; // Output: P236
+// Function to pad the Soundex code to 4 characters
+std::string padSoundex(const std::string& soundex) {
+    std::string paddedSoundex = soundex;
+    paddedSoundex.resize(4, '0');
+    return paddedSoundex;
+}
 
-    return 0;
+// Main function to generate Soundex code
+std::string generateSoundex(const std::string& name) {
+    if (name.empty()) return "";
+    std::string soundex = accumulateSoundexCodes(name);
+    return padSoundex(soundex);
 }
